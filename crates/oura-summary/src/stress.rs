@@ -27,7 +27,9 @@ use crate::ring_time::RingClock;
 const SLOT_S: i64 = 15 * 60;
 const MIN_BEATS: usize = 20;
 /// Seconds of movement inside a slot that make it "active" rather than stress-scorable.
-const ACTIVE_MOTION_S: f64 = 60.0;
+/// motion_event reports seconds moving per ~30 s window: sustained walking sums to
+/// ~800 s per slot, fidgeting while seated or in bed to well under 100.
+const ACTIVE_MOTION_S: f64 = 240.0;
 const BASELINE_DAYS: i64 = 14;
 /// Quiet slots needed before the baseline is trusted.
 const MIN_BASELINE_SLOTS: usize = 12;
@@ -175,7 +177,8 @@ pub fn daytime_stress(db: &Path, tz: f64, nights: &Value) -> Result<Value> {
         .map(|(date, slots)| {
             let mins = |st: &str| slots.iter().filter(|s| s["state"] == st).count() as i64 * (SLOT_S / 60);
             let (stressed, restored) = (mins("stressed"), mins("restored"));
-            let summary = if mins("learning") as usize * 2 > slots.len() * (SLOT_S as usize / 60) {
+            let scored = stressed + restored + mins("engaged") + mins("relaxed");
+            let summary = if scored == 0 || mins("learning") > scored {
                 "learning"
             } else if stressed >= 90 && stressed > 2 * restored {
                 "stressful"
