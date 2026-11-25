@@ -17,6 +17,7 @@ pub mod research_export;
 pub mod ring_time;
 pub mod readiness;
 pub mod stress;
+pub mod workouts;
 pub mod sleep_score;
 pub mod symptoms;
 
@@ -2782,6 +2783,10 @@ pub fn build_summary(
                 }
             }
         }
+    }
+    // No activity model installed → fall back to rule-based sessions from the MET stream.
+    if activity.is_empty() {
+        activity = workouts::detect(&met_min.iter().map(|(k, v)| (*k, *v)).collect());
     }
     for sess in activity.iter_mut() {
         let (Some(start), Some(dur)) = (sess["start"].as_str(), sess["duration_min"].as_f64())
