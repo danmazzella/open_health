@@ -15,6 +15,7 @@
 pub mod hourly_hr;
 pub mod research_export;
 pub mod ring_time;
+pub mod activity_score;
 pub mod readiness;
 pub mod stress;
 pub mod workouts;
@@ -3137,6 +3138,7 @@ pub fn build_summary(
     });
     // Readiness reads the finished nights + activity, so it's computed last.
     out["readiness"] = readiness::score_days(&out);
+    out["activity_score"] = activity_score::score_days(&out);
     // Daytime stress needs the sleep windows above to know which beats are waking hours.
     out["stress"] = stress::daytime_stress(db, tz, &out["nights"]).unwrap_or(Value::Null);
     Ok(out)
