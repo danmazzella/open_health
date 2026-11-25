@@ -2182,6 +2182,7 @@ pub fn build_summary(
             "sleep_acm_period"
                 | "sleep_temp_event"
                 | "spo2_r_pi_event"
+                | "spo2_event"
                 | "sleep_period_information_2"
         ) {
             sleep_support.push((*ds, *cu));
@@ -2390,6 +2391,18 @@ pub fn build_summary(
                         .filter_map(|x| x.as_f64())
                         .filter(|&x| x > 0.0)
                         .map(spo2_pct)
+                        .collect();
+                    nights[idx].spo2_t.extend(pcts.iter().map(|&p| (*ds, p)));
+                    nights[idx].spo2.extend(pcts);
+                }
+            }
+            // Ring 4 firmware reports SpO2 already as percent (0 = no valid reading)
+            "spo2_event" => {
+                if let Some(a) = v["spo2_percent"].as_array() {
+                    let pcts: Vec<f64> = a
+                        .iter()
+                        .filter_map(|x| x.as_f64())
+                        .filter(|&x| (70.0..=100.0).contains(&x))
                         .collect();
                     nights[idx].spo2_t.extend(pcts.iter().map(|&p| (*ds, p)));
                     nights[idx].spo2.extend(pcts);
@@ -2887,7 +2900,7 @@ pub fn build_summary(
             ),
             "daytime_hr"
         ),
-        feat("SpO2", cap_on("spo2", has("spo2_r_pi_event")), "spo2"),
+        feat("SpO2", cap_on("spo2", has("spo2_r_pi_event") || has("spo2_event")), "spo2"),
         feat(
             "Exercise HR",
             cap_on("exercise_hr", has("ehr_trace_event")),
@@ -2911,7 +2924,7 @@ pub fn build_summary(
     let mut sc: std::collections::BTreeMap<&str, i64> = Default::default();
     for (_ds, tag, _j, _) in &events {
         let cat = match name_of(*tag) {
-            "spo2_r_pi_event" => Some("Blood oxygen"),
+            "spo2_r_pi_event" | "spo2_event" => Some("Blood oxygen"),
             "ibi_and_amplitude_event" | "green_ibi_quality_event" => Some("Heart beats"),
             "ehr_trace_event" | "ehr_acm_intensity_event" => Some("Exercise HR"),
             "motion_event" | "sleep_acm_period" => Some("Motion"),
@@ -2954,7 +2967,7 @@ pub fn build_summary(
             has("cva_raw_ppg_data"),
             "enable cva_ppg"
         ),
-        insight("SpO2", has("spo2_r_pi_event"), "enable spo2"),
+        insight("SpO2", has("spo2_r_pi_event") || has("spo2_event"), "enable spo2"),
         insight("Activity sessions", true, ""),
         insight("HRV / resting HR", true, ""),
         insight(
