@@ -1383,11 +1383,13 @@ fn beds_from_sleep_signal(
     unix_s_at: impl Fn(i64, i64) -> f64 + Copy,
 ) -> Vec<BedPeriod> {
     let mut derived: Vec<BedPeriod> = Vec::new();
+    // Covered = mostly inside a known bed. Strict containment let a derived copy that ran
+    // a few seconds past the ring's bedtime through as a second, near-empty night.
     let covered = |start: i64, end: i64, derived: &[BedPeriod]| {
-        explicit
-            .iter()
-            .chain(derived.iter())
-            .any(|bed| bed.start_ds <= start && end <= bed.end_ds)
+        explicit.iter().chain(derived.iter()).any(|bed| {
+            let overlap = end.min(bed.end_ds) - start.max(bed.start_ds);
+            overlap * 2 > end - start
+        })
     };
 
     // 1. the ring's own analysed sleeps
@@ -3160,6 +3162,21 @@ pub fn build_summary(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn derived_bed_slightly_wider_than_ring_bedtime_is_not_a_second_night() {
+        let bed = |start_ds, end_ds| BedPeriod {
+            start_ds, end_ds, raw_start_ds: start_ds, raw_end_ds: end_ds,
+            captured_unix: 1_795_609_926, staged: false,
+        };
+        let sleep = |start_ds, end_ds| RingSleep { start_ds, end_ds, captured_unix: 1_795_609_926, codes: vec![] };
+        let at = |ds: i64, cu: i64| cu as f64 + ds as f64 / 10.0;
+        // the real case: ring bedtime 131721–372021, staged sleep 131504–372104
+        let explicit = [bed(131_721, 372_021)];
+        assert!(beds_from_sleep_signal(&explicit, &[sleep(131_504, 372_104)], &[], &[], at).is_empty());
+        // a separate sleep that merely touches the bed still counts
+        assert_eq!(beds_from_sleep_signal(&explicit, &[sleep(371_000, 600_000)], &[], &[], at).len(), 1);
+    }
 
     #[test]
     fn battery_headline_prefers_the_newest_dated_reading() {
