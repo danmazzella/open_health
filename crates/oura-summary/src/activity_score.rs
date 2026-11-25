@@ -40,15 +40,15 @@ fn waking_slots(summary: &Value, day: &str) -> Vec<usize> {
         .filter_map(|n| Some((num(&n["start_unix"])?, num(&n["end_unix"])?)))
         .filter(|(a, b)| *b > day_start && *a < day_start + 86_400.0)
         .collect();
-    if sleeps.is_empty() {
-        return (28..92).collect(); // 07:00–23:00
-    }
-    (0..96)
-        .filter(|i| {
-            let mid = day_start + (*i as f64 + 0.5) * 900.0;
-            !sleeps.iter().any(|(a, b)| mid >= *a && mid <= *b)
-        })
-        .collect()
+    // Only time that has already happened can count as inactive (matters for today).
+    let now = num(&summary["generated_at"]).unwrap_or(f64::INFINITY);
+    let mid = |i: usize| day_start + (i as f64 + 0.5) * 900.0;
+    let base: Vec<usize> = if sleeps.is_empty() {
+        (28..92).collect() // 07:00–23:00
+    } else {
+        (0..96).filter(|i| !sleeps.iter().any(|(a, b)| mid(*i) >= *a && mid(*i) <= *b)).collect()
+    };
+    base.into_iter().filter(|i| mid(*i) <= now).collect()
 }
 
 fn parse_day(day: &str) -> Option<i64> {
@@ -75,6 +75,9 @@ fn score_day(summary: &Value, day: &str, prior_days: &[String]) -> Option<Value>
     comps.push(("stay_active", curve(inactive_h, &[(5.0, 100.0), (8.0, 80.0), (10.0, 55.0), (12.0, 25.0), (14.0, 5.0)]),
         json!({"inactive_h": inactive_h})));
 
+    if waking.is_empty() {
+        return None; // nothing elapsed yet today
+    }
     // Move every hour: waking hours with no movement at all in any of their 4 slots.
     let mut still_hours = 0;
     for h in 0..24 {
