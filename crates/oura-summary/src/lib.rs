@@ -15,6 +15,7 @@
 pub mod hourly_hr;
 pub mod research_export;
 pub mod ring_time;
+pub mod readiness;
 pub mod sleep_score;
 pub mod symptoms;
 
@@ -3098,7 +3099,7 @@ pub fn build_summary(
     clock_diag["undated_reasons"] = json!(undated_reasons_json);
     clock_diag["warnings"] = json!(clock_warnings);
 
-    Ok(json!({
+    let mut out = json!({
         "generated_at": now,
         "tz": tz,
         "digest": digest,
@@ -3127,7 +3128,10 @@ pub fn build_summary(
                 "at_unix": at.round() as i64,
             })),
         },
-    }))
+    });
+    // Readiness reads the finished nights + activity, so it's computed last.
+    out["readiness"] = readiness::score_days(&out);
+    Ok(out)
 }
 
 #[cfg(test)]

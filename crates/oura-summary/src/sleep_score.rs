@@ -93,7 +93,7 @@ struct Component {
 /// Piecewise-linear interpolation through `(input, score)` anchors, which must be
 /// sorted by input. Outside the ends it clamps, so an absurd input cannot produce an
 /// absurd score.
-fn curve(x: f64, anchors: &[(f64, f64)]) -> f64 {
+pub(crate) fn curve(x: f64, anchors: &[(f64, f64)]) -> f64 {
     if x <= anchors[0].0 {
         return anchors[0].1;
     }
